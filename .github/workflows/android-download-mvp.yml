@@ -1,0 +1,48 @@
+name: Android Download MVP APK
+
+on:
+  push:
+    branches:
+      - feature/android-download-mvp
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    name: Build Android arm64 APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '17'
+          cache: gradle
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Build signed testing APK
+        env:
+          DISABLE_SVG: '1'
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon --stacktrace
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: lx-music-mobile-download-mvp-arm64
+          path: |
+            android/app/build/outputs/apk/release/*arm64-v8a.apk
+            android/app/build/outputs/apk/release/*universal.apk
+          if-no-files-found: error
+          retention-days: 30
