@@ -1,0 +1,37 @@
+# LX Music Android Download MVP（公开个人测试版）
+
+基于 [LX Music 官方 Android 仓库](https://github.com/lyswhut/lx-music-mobile) 的 Apache-2.0 授权源码。下载功能由本 Fork 独立添加，保留原项目的音源解析及播放逻辑。
+
+## 本版功能
+
+- 在线搜索结果、在线歌单及「我的列表」歌曲菜单新增「下载」。
+- 支持单曲下载；长按歌曲进入多选后，从任意一首歌右侧菜单选择「下载」即可将所选歌曲加入队列。
+- 音质可选 128K、320K、FLAC、FLAC Hi-Res。最终扩展名根据实际音频内容自动识别，防止将 MP3 错误标记为 FLAC。
+- 自动调用 LX 当前音源获取音频链接，保留原项目的换源能力。
+- 可选择同名 LRC 歌词、翻译与罗马音；音频成功但歌词缺失会在队列中单独显示。
+- 下载队列最多两首并发，显示进度、暂停、重试、移除及错误信息；未完成任务可持久化恢复。
+- 下载管理独立导航页，可修改保存文件夹。首次下载会弹出 Android SAF 系统目录选择器。
+- Android 使用独立应用 ID：`cn.toside.music.mobile.downloader`，可与官方 LX 并存。
+
+## 安装与使用
+
+1. 从本 Fork 的 [Releases](https://github.com/hikjesen/lx-music-mobile/releases) 下载 ARM64 APK。
+2. 安装后按正常 LX Music 流程导入已有可用的第三方自定义音源；两个独立安装包的应用数据不会自动共用。
+3. 在播放列表或搜索结果点击歌曲右侧的三个点 → 下载 → 选择音质。
+4. 首次使用时由系统文件选择器授权目标文件夹，推荐 `Music/LX Music`，下载文件将直接出现在这里。
+5. 从侧边栏进入「下载管理」查看任务状态、调整保存路径与重试失败任务。
+
+## 技术与范围
+
+- 核心实现：`src/core/download/manager.ts`。
+- Android 文件保存：下载到应用私有文档目录后，通过 LX 现有 SAF 文件系统模块移动到用户选择的目录；无需 Root、Shizuku。
+- 当前暂停行为会停止网络任务，恢复时重新下载当前文件（不保留 HTTP Range 断点）；不会删除已完成的其他文件。
+- Android 后台长时间持续下载暂未作为 MVP 保证，建议大批量下载时保持应用前台运行。
+- 实际歌曲是否有可用下载地址取决于现有自定义音源及其访问权限。
+- 公开测试包使用仓库附带的 Android 测试签名，非商用正式签名。请勿将其误认为官方发布版。
+
+## 代码改造与打包
+
+工作流：`.github/workflows/android-download-mvp.yml`，以 GitHub Actions（JDK 17 + Node 18 + Gradle）构建 `assembleRelease` 并上传 APK Artifact。该测试包在 Gradle 的 release variant 下生成，以便在不连接 Metro 开发服务器的情况下独立运行。
+
+许可证与原作者信息保留在仓库中。
