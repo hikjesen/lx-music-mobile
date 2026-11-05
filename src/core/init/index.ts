@@ -14,6 +14,7 @@ import settingState from '@/store/setting/state'
 import { checkUpdate } from '@/core/version'
 import { bootLog } from '@/utils/bootLog'
 import { cheatTip } from '@/utils/tools'
+import { initializeDownloads } from '@/core/download/manager'
 
 let isFirstPush = true
 const handlePushedHomeScreen = async() => {
@@ -62,6 +63,8 @@ export default async() => {
 
   void initSync(setting)
   bootLog('Sync inited.')
+
+  void initializeDownloads().catch(err => console.error('Download initialization failed', err))
 
   // syncSetting()
 

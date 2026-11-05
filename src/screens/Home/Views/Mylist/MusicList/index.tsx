@@ -15,6 +15,7 @@ import ListMusicSearch, { type ListMusicSearchType } from './ListMusicSearch'
 import MusicPositionModal, { type MusicPositionModalType } from './MusicPositionModal'
 import MetadataEditModal, { type MetadataEditType, type MetadataEditProps } from '@/components/MetadataEditModal'
 import MusicToggleModal, { type MusicToggleModalType } from './MusicToggleModal'
+import DownloadDialog, { type DownloadDialogType } from '@/components/DownloadDialog'
 
 
 export default () => {
@@ -30,6 +31,7 @@ export default () => {
   const metadataEditTypeRef = useRef<MetadataEditType>(null)
   const listMenuRef = useRef<ListMenuType>(null)
   const musicToggleModalRef = useRef<MusicToggleModalType>(null)
+  const downloadDialogRef = useRef<DownloadDialogType>(null)
   const layoutHeightRef = useRef<number>(0)
   const isShowMultipleModeBar = useRef(false)
   const isShowSearchBarModeBar = useRef(false)
@@ -160,6 +162,7 @@ export default () => {
         onCopyName={info => { handleShare(info.musicInfo) }}
         onMusicSourceDetail={info => { void handleShowMusicSourceDetail(info.musicInfo) }}
         onAdd={handleAddMusic}
+        onDownload={info => { downloadDialogRef.current?.show((info.selectedList.length ? info.selectedList : [info.musicInfo]).filter(m => m.source !== 'local') as LX.Music.MusicInfoOnline[]) }}
         onMove={handleMoveMusic}
         onEditMetadata={handleEditMetadata}
         onChangePosition={info => musicPositionModalRef.current?.show(info)}
@@ -171,6 +174,7 @@ export default () => {
         onUpdate={handleUpdateMetadata}
       />
       <MusicToggleModal ref={musicToggleModalRef} />
+      <DownloadDialog ref={downloadDialogRef} />
     </View>
   )
 }
