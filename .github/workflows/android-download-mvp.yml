@@ -32,7 +32,7 @@ jobs:
         run: npm ci
       - name: Lint download modules
         run: |
-          npx eslint src/core/download/manager.ts src/core/download/resolver.ts src/components/DownloadDialog.tsx src/screens/Home/Views/Download/index.tsx
+          npx eslint src/core/download/manager.ts src/core/download/resolver.ts src/core/download/nativeTransport.ts src/components/DownloadDialog.tsx src/screens/Home/Views/Download/index.tsx
       - name: Build signed testing APK
         env:
           DISABLE_SVG: '1'

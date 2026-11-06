@@ -21,6 +21,7 @@ import androidx.core.os.LocaleListCompat;
 
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
+import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
@@ -38,17 +39,33 @@ public class UtilsModule extends ReactContextBaseJavaModule {
   private int listenerCount = 0;
 
   UtilsEvent utilsEvent;
+  private final AudioDownloadHelper audioDownloader;
 
   UtilsModule(ReactApplicationContext reactContext) {
     super(reactContext);
     this.reactContext = reactContext;
     utilsEvent = new UtilsEvent(reactContext);
+    audioDownloader = new AudioDownloadHelper(reactContext, utilsEvent);
     registerScreenBroadcastReceiver();
   }
 
   @Override
   public String getName() {
     return "UtilsModule";
+  }
+
+  /**
+   * Exported through the same UtilsModule that the official application uses.
+   * All bytes are streamed to the app's private files directory.
+   */
+  @ReactMethod
+  public void downloadAudioFile(String id, String url, String destPath, ReadableMap headers, Promise promise) {
+    audioDownloader.start(id, url, destPath, headers, promise);
+  }
+
+  @ReactMethod
+  public void cancelAudioDownload(String id) {
+    audioDownloader.cancel(id);
   }
 
   @ReactMethod

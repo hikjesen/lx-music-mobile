@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import RNFS from 'react-native-fs'
-import { Buffer } from '@craftzdog/react-native-buffer'
 import { getLyricInfo } from '@/core/music/online'
 import { resolveDownloadUrl } from './resolver'
+import { cancelNativeAudioDownload, downloadAudioNative } from './nativeTransport'
 import {
   privateStorageDirectoryPath,
   selectManagedFolder,
@@ -13,7 +12,6 @@ import {
   writeFile,
   unlink,
   downloadFile,
-  stopDownload,
 } from '@/utils/fs'
 
 export type DownloadQuality = '128k' | '320k' | 'flac' | 'flac24bit'
@@ -56,7 +54,7 @@ let initialized = false
 let initPromise: Promise<void> | null = null
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 const listeners = new Set<() => void>()
-const jobs = new Map<string, number>()
+const jobs = new Set<string>()
 const running = new Set<string>()
 
 const emit = () => {
@@ -160,8 +158,7 @@ export const pauseDownload = (id: string) => {
   const task = tasks.find(t => t.id === id)
   if (!task || (task.status !== 'running' && task.status !== 'waiting')) return
   task.status = 'paused'
-  const job = jobs.get(id)
-  if (job != null) stopDownload(job)
+  if (jobs.has(id)) cancelNativeAudioDownload(id)
   emit()
 }
 
@@ -183,20 +180,6 @@ export const removeDownload = (id: string) => {
   pauseDownload(id)
   tasks = tasks.filter(t => t.id !== id)
   emit()
-}
-
-const detectExt = async(path: string, quality: DownloadQuality): Promise<string> => {
-  const base64 = await RNFS.read(path, 20, 0, 'base64')
-  const head = Buffer.from(base64, 'base64')
-  const four = head.subarray(0, 4).toString('ascii')
-  if (four === 'fLaC') return 'flac'
-  if (four === 'OggS') return 'ogg'
-  if (four === 'RIFF') return 'wav'
-  if (four === 'MAC ') return 'ape'
-  if (four === 'ID3' || (head.length >= 2 && head[0] === 255 && (head[1] & 224) === 224)) return 'mp3'
-  if (head.subarray(4, 8).toString('ascii') === 'ftyp') return 'm4a'
-  // Do not mislabel unknown files as FLAC merely because it was requested.
-  throw new Error('下载结果无法识别为音频文件（期望音质：' + quality + '）')
 }
 
 const formatLrc = (info: LX.Player.LyricInfo, opts: DownloadOptions, music: LX.Music.MusicInfoOnline): string => {
@@ -257,12 +240,15 @@ const saveLyrics = async(task: DownloadTask, fileBase: string, currentFolder: st
 }
 
 const downloadOne = async(task: DownloadTask) => {
-  let tmp = WORK_DIR + '/' + cleanName(task.id) + '.part'
+  const tmp = WORK_DIR + '/' + cleanName(task.id) + '.part'
+  let stage = '准备临时文件'
   try {
     await mkdir(WORK_DIR)
+    stage = '检查文件夹权限'
     const currentFolder = await validateFolder()
     for (let attempt = 0; attempt < 2; attempt++) {
       if (!taskLive(task)) return
+      stage = '解析音频地址'
       let resolved
       try {
         resolved = await resolveDownloadUrl(task.musicInfo, task.quality, attempt > 0)
@@ -270,25 +256,24 @@ const downloadOne = async(task: DownloadTask) => {
         if (attempt === 0) continue
         throw err
       }
-      const url = resolved.url
+
       task.sourceDetail = resolved.detail
       emit()
       await unlink(tmp).catch(() => {})
-      const job = downloadFile(url, tmp, {
-        headers: resolved.headers,
-        progressInterval: 500,
-        progress: data => {
-          if (!taskLive(task)) return
-          task.received = data.bytesWritten
-          task.total = data.contentLength
-          task.progress = data.contentLength ? Math.floor(100 * data.bytesWritten / data.contentLength) : 0
-          emit()
-        },
-      })
-      jobs.set(task.id, job.jobId)
-      let result: RNFS.DownloadResult
+      stage = '原生网络下载'
+      jobs.add(task.id)
+      let result
       try {
-        result = await job.promise
+        result = await downloadAudioNative(
+          task.id, resolved.url, tmp, resolved.headers,
+          (received, total) => {
+            if (!taskLive(task)) return
+            task.received = received
+            task.total = total
+            task.progress = total > 0 ? Math.floor(100 * received / total) : 0
+            emit()
+          },
+        )
       } catch (error) {
         if (!taskLive(task)) return
         if (attempt === 0) continue
@@ -301,11 +286,16 @@ const downloadOne = async(task: DownloadTask) => {
         if (attempt === 0) continue
         throw new Error('HTTP ' + result.statusCode)
       }
-      const fileStat = await RNFS.stat(tmp)
-      if (Number(fileStat.size) < 1024) throw new Error('下载的音频文件过小')
-      const ext = await detectExt(tmp, task.quality)
+
+      stage = '校验音频格式'
+      const ext = result.extension
+      if (!['mp3', 'flac', 'ogg', 'ape', 'wav', 'm4a'].includes(ext)) {
+        throw new Error('未知音频格式：' + ext)
+      }
+
       const fileBase = basename(task.musicInfo)
       const fileName = fileBase + '.' + ext
+      stage = '导出音频至共享文件夹'
       const files = await readDir(currentFolder)
       if (!taskLive(task)) return
       if (!files.some(file => file.name === fileName)) {
@@ -313,6 +303,7 @@ const downloadOne = async(task: DownloadTask) => {
       }
       if (!taskLive(task)) return
       task.fileName = fileName
+      stage = '保存歌词'
       await saveLyrics(task, fileBase, currentFolder)
       if (!taskLive(task)) return
       task.progress = 100
@@ -321,11 +312,12 @@ const downloadOne = async(task: DownloadTask) => {
       emit()
       return
     }
-    throw new Error('下载失败，音源连接可能失效')
-  } catch (error: any) {
+    throw new Error('下载失败，音源链接可能失效')
+  } catch (error: unknown) {
     if (!taskLive(task)) return
     task.status = 'failed'
-    task.error = error?.message || String(error)
+    const message = error instanceof Error ? error.message : String(error)
+    task.error = stage + '：' + message
     emit()
     // Audio and lyric retrieval are independent. A failed audio link should
     // not prevent saving a successfully resolved LRC file.
@@ -340,6 +332,7 @@ const downloadOne = async(task: DownloadTask) => {
     pump()
   }
 }
+
 const pump = () => {
   if (!initialized) return
   while (running.size < MAX_CONCURRENT) {
