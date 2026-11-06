@@ -30,7 +30,9 @@ export default forwardRef<DownloadDialogType, {}>((_, ref) => {
     },
   }))
 
-  const updateOption = (key: keyof DownloadOptions, value: boolean) => setOptions(prev => ({ ...prev, [key]: value }))
+  const updateOption = (key: keyof DownloadOptions, value: boolean) => {
+    setOptions(prev => ({ ...prev, [key]: value }))
+  }
   const start = async(quality: DownloadQuality) => {
     if (busy) return
     setBusy(true)
@@ -39,15 +41,15 @@ export default forwardRef<DownloadDialogType, {}>((_, ref) => {
     try {
       const count = await queueDownloads(songs, quality, options)
       toast('已加入 ' + count + ' 首歌曲到下载队列')
-    } catch (err: any) {
-      Alert.alert('下载任务创建失败', err?.message || String(err))
+    } catch (err: unknown) {
+      Alert.alert('下载任务创建失败', err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => setVisible(false)}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => { setVisible(false) }}>
       <View style={styles.backdrop}>
         <View style={{ ...styles.panel, backgroundColor: theme['c-content-background'] }}>
           <Text style={styles.heading} size={18}>下载歌曲（{songs.length} 首）</Text>
@@ -60,18 +62,18 @@ export default forwardRef<DownloadDialogType, {}>((_, ref) => {
             ))}
             <View style={styles.option}>
               <Text>同时保存 LRC 歌词</Text>
-              <Switch value={options.saveLyric} onValueChange={v => updateOption('saveLyric', v)} />
+              <Switch value={options.saveLyric} onValueChange={v => { updateOption('saveLyric', v) }} />
             </View>
             <View style={styles.option}>
               <Text>包含翻译歌词</Text>
-              <Switch value={options.translation} disabled={!options.saveLyric} onValueChange={v => updateOption('translation', v)} />
+              <Switch value={options.translation} disabled={!options.saveLyric} onValueChange={v => { updateOption('translation', v) }} />
             </View>
             <View style={styles.option}>
               <Text>包含罗马音</Text>
-              <Switch value={options.romanization} disabled={!options.saveLyric} onValueChange={v => updateOption('romanization', v)} />
+              <Switch value={options.romanization} disabled={!options.saveLyric} onValueChange={v => { updateOption('romanization', v) }} />
             </View>
           </ScrollView>
-          <TouchableOpacity onPress={() => setVisible(false)} style={styles.cancel}>
+          <TouchableOpacity onPress={() => { setVisible(false) }} style={styles.cancel}>
             <Text>取消</Text>
           </TouchableOpacity>
         </View>

@@ -26,14 +26,14 @@ export const resolveDownloadUrl = async(
   const current = playerState.playMusicInfo.musicInfo
   const activeSameSong = current != null && !('progress' in current) &&
     current.source !== 'local' && looksLikeSameSong(musicInfo, current)
-  const activeMusic = activeSameSong ? current as LX.Music.MusicInfoOnline : null
+  const activeMusic = activeSameSong ? current : null
 
   // Follow the actual playback logic: a previously chosen alternate source
   // may be the only source that can resolve this track.
-  const preferred = musicInfo.meta.toggleMusicInfo || activeMusic?.meta.toggleMusicInfo
+  const preferred = musicInfo.meta.toggleMusicInfo ?? activeMusic?.meta.toggleMusicInfo
   const attempts: Array<{ music: LX.Music.MusicInfoOnline, requested: boolean, label: string }> = []
   const add = (music: LX.Music.MusicInfoOnline | undefined, requested: boolean, label: string) => {
-    if (!music) return
+    if (!music) { return }
     if (attempts.some(item => item.music.source === music.source && item.music.id === music.id && item.requested === requested)) return
     attempts.push({ music, requested, label })
   }
@@ -52,13 +52,12 @@ export const resolveDownloadUrl = async(
         isRefresh,
         allowToggleSource: false,
       })
-      if (url && /^https?:\/\//i.test(url)) return {
-        url,
-        detail: attempt.label,
+      if (url && /^https?:\/\//i.test(url)) {
+        return { url, detail: attempt.label }
       }
       reasons.push(attempt.label + '：无可用 HTTP 音频地址')
-    } catch (err: any) {
-      reasons.push(attempt.label + '：' + (err?.message || String(err)))
+    } catch (err: unknown) {
+      reasons.push(attempt.label + '：' + (err instanceof Error ? err.message : String(err)))
     }
   }
 
@@ -68,7 +67,7 @@ export const resolveDownloadUrl = async(
   if (activeSameSong) {
     try {
       const track = await getCurrentTrack()
-      if (track && !isTempTrack(track.id) &&
+      if (track && !isTempTrack(String(track.id)) &&
         /^https?:\/\//i.test(track.url) &&
         (track.musicId === activeMusic?.id || track.musicId === musicInfo.id) &&
         track.title?.trim().toLowerCase() === musicInfo.name.trim().toLowerCase()) {
@@ -78,8 +77,8 @@ export const resolveDownloadUrl = async(
           headers: track.userAgent ? { 'User-Agent': track.userAgent } : undefined,
         }
       }
-    } catch (err: any) {
-      reasons.push('当前播放器地址：' + (err?.message || String(err)))
+    } catch (err: unknown) {
+      reasons.push('当前播放器地址：' + (err instanceof Error ? err.message : String(err)))
     }
   }
 
@@ -92,12 +91,11 @@ export const resolveDownloadUrl = async(
       isRefresh,
       allowToggleSource: true,
     })
-    if (url && /^https?:\/\//i.test(url)) return {
-      url,
-      detail: 'LX 自动换源／自动音质',
+    if (url && /^https?:\/\//i.test(url)) {
+      return { url, detail: 'LX 自动换源／自动音质' }
     }
-  } catch (err: any) {
-    reasons.push('自动换源：' + (err?.message || String(err)))
+  } catch (err: unknown) {
+    reasons.push('自动换源：' + (err instanceof Error ? err.message : String(err)))
   }
 
   console.warn('Audio URL resolution failed', reasons)

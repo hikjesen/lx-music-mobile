@@ -67,6 +67,8 @@ const emit = () => {
     void AsyncStorage.setItem(STORE_KEY, JSON.stringify({ folder, tasks } satisfies SavedState)).catch(console.error)
   }, 500)
 }
+// Android file names may not contain ASCII control characters.
+// eslint-disable-next-line no-control-regex
 const cleanName = (name: string) => name.replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim().replace(/[. ]+$/g, '').slice(0, 90) || 'Unknown'
 const basename = (music: LX.Music.MusicInfoOnline) => cleanName(music.singer || 'Unknown') + ' - ' + cleanName(music.name)
 const taskKey = (music: LX.Music.MusicInfoOnline, quality: DownloadQuality) => music.source + '_' + music.id + '_' + quality
@@ -101,7 +103,10 @@ export const initializeDownloads = async(): Promise<void> => {
     emit()
     pump()
   })()
-  try { await initPromise } finally { initPromise = null }
+  try { await initPromise } finally {
+    // eslint-disable-next-line require-atomic-updates
+    initPromise = null
+  }
 }
 
 export const chooseDownloadFolder = async(): Promise<string> => {
@@ -200,7 +205,7 @@ const formatLrc = (info: LX.Player.LyricInfo, opts: DownloadOptions, music: LX.M
     if (!text) return
     for (const line of text.split(/\r?\n/)) {
       const match = /^\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\](.*)$/.exec(line.trim())
-      if (!match || !match[4].trim()) continue
+      if (!match?.[4]?.trim()) continue
       const frac = (match[3] || '0').padEnd(3, '0').slice(0, 3)
       lines.push({
         ms: (Number(match[1]) * 60 + Number(match[2])) * 1000 + Number(frac),

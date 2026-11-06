@@ -39,7 +39,7 @@ export default () => {
       setFolder(getDownloadFolder())
     }
     const unsubscribe = subscribeDownloads(refresh)
-    void initializeDownloads().then(refresh).catch(error => Alert.alert('下载初始化失败', String(error)))
+    void initializeDownloads().then(refresh).catch(error => { Alert.alert('下载初始化失败', String(error)) })
     return unsubscribe
   }, [])
 
@@ -47,14 +47,14 @@ export default () => {
     try {
       await chooseDownloadFolder()
       setFolder(getDownloadFolder())
-    } catch (err: any) {
-      Alert.alert('选择下载目录', err?.message || String(err))
+    } catch (err: unknown) {
+      Alert.alert('选择下载目录', err instanceof Error ? err.message : String(err))
     }
   }
   const remove = (task: DownloadTask) => {
     Alert.alert('移除下载任务', task.musicInfo.name, [
       { text: '取消', style: 'cancel' },
-      { text: '移除', style: 'destructive', onPress: () => removeDownload(task.id) },
+      { text: '移除', style: 'destructive', onPress: () => { removeDownload(task.id) } },
     ])
   }
 
@@ -70,11 +70,11 @@ export default () => {
       {item.fileName ? <Text style={styles.detail} size={12}>{item.fileName}</Text> : null}
       <View style={styles.buttons}>
         {item.status === 'waiting' || item.status === 'running'
-          ? <TouchableOpacity style={styles.action} onPress={() => pauseDownload(item.id)}><Text>暂停</Text></TouchableOpacity>
+          ? <TouchableOpacity style={styles.action} onPress={() => { pauseDownload(item.id) }}><Text>暂停</Text></TouchableOpacity>
           : item.status === 'paused' || item.status === 'failed'
-            ? <TouchableOpacity style={styles.action} onPress={() => resumeDownload(item.id)}><Text>重试 / 继续</Text></TouchableOpacity>
+            ? <TouchableOpacity style={styles.action} onPress={() => { resumeDownload(item.id) }}><Text>重试 / 继续</Text></TouchableOpacity>
             : null}
-        <TouchableOpacity style={styles.action} onPress={() => remove(item)}><Text>移除</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.action} onPress={() => { remove(item) }}><Text>移除</Text></TouchableOpacity>
       </View>
     </View>
   )
