@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import RNFS from 'react-native-fs'
 import { Buffer } from '@craftzdog/react-native-buffer'
-import { getMusicUrl, getLyricInfo } from '@/core/music/online'
+import { getLyricInfo } from '@/core/music/online'
+import { resolveDownloadUrl } from './resolver'
 import {
   privateStorageDirectoryPath,
   selectManagedFolder,
@@ -33,6 +34,7 @@ export interface DownloadTask {
   fileName: string
   lyricStatus: 'pending' | 'saved' | 'missing' | 'disabled'
   error: string
+  sourceDetail?: string
   options: DownloadOptions
 }
 interface SavedState {
@@ -163,6 +165,8 @@ export const resumeDownload = (id: string) => {
   if (!task || task.status === 'running') return
   task.status = 'waiting'
   task.error = ''
+  task.sourceDetail = ''
+  task.lyricStatus = task.options.saveLyric ? 'pending' : 'disabled'
   task.progress = 0
   task.received = 0
   task.total = 0
@@ -254,14 +258,19 @@ const downloadOne = async(task: DownloadTask) => {
     const currentFolder = await validateFolder()
     for (let attempt = 0; attempt < 2; attempt++) {
       if (!taskLive(task)) return
-      const url = await getMusicUrl({
-        musicInfo: task.musicInfo,
-        quality: task.quality,
-        isRefresh: attempt > 0,
-      })
-      if (!url) throw new Error('音源未返回下载地址')
+      let resolved
+      try {
+        resolved = await resolveDownloadUrl(task.musicInfo, task.quality, attempt > 0)
+      } catch (err) {
+        if (attempt === 0) continue
+        throw err
+      }
+      const url = resolved.url
+      task.sourceDetail = resolved.detail
+      emit()
       await unlink(tmp).catch(() => {})
       const job = downloadFile(url, tmp, {
+        headers: resolved.headers,
         progressInterval: 500,
         progress: data => {
           if (!taskLive(task)) return
@@ -313,6 +322,12 @@ const downloadOne = async(task: DownloadTask) => {
     task.status = 'failed'
     task.error = error?.message || String(error)
     emit()
+    // Audio and lyric retrieval are independent. A failed audio link should
+    // not prevent saving a successfully resolved LRC file.
+    if (task.options.saveLyric && task.lyricStatus !== 'saved') {
+      await saveLyrics(task, basename(task.musicInfo), folder)
+      emit()
+    }
   } finally {
     jobs.delete(task.id)
     await unlink(tmp).catch(() => {})

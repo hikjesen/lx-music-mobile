@@ -65,6 +65,7 @@ export default () => {
       <Text size={12} style={styles.detail}>
         {item.status === 'running' ? item.progress + '% · ' : ''}{lyricLabels[item.lyricStatus]}
       </Text>
+      {item.sourceDetail ? <Text style={styles.detail} size={12}>{item.sourceDetail}</Text> : null}
       {item.error ? <Text style={styles.error} size={12}>{item.error}</Text> : null}
       {item.fileName ? <Text style={styles.detail} size={12}>{item.fileName}</Text> : null}
       <View style={styles.buttons}>
