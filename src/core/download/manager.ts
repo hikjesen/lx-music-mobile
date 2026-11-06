@@ -11,7 +11,6 @@ import {
   readDir,
   writeFile,
   unlink,
-  downloadFile,
 } from '@/utils/fs'
 
 export type DownloadQuality = '128k' | '320k' | 'flac' | 'flac24bit'
